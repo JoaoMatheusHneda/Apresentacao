@@ -1,0 +1,850 @@
+---
+title: "Introduction to Machine Learning with Applications"
+subtitle: "Report presenting as part of the avaliation to the discipline &#128187;&#128202;&#129302;"
+author: "Hevans Vinicius Pereira, João Matheus Slujala Krüger Taborda Hneda, Marcos da Silva Medeiros, Vanessa de Oliveira Lima"
+date: '19/08/2022'
+output:
+  xaringan::moon_reader:
+    css: xaringan-themer.css
+    nature:
+      #slideNumberFormat: "%current%"
+      highlightStyle: github
+      highlightLines: true
+      ratio: 16:9
+      countIncrementalSlides: true
+---
+
+```{r live_slides, echo=FALSE, eval=FALSE}
+# Serve and live reload slides
+xaringan::inf_mr()
+```
+
+```{r setup, include=FALSE}
+# `r Sys.Date()`
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(
+  fig.width=9, fig.height=4, fig.retina=3, fig.align = 'center', 
+  out.width = "100%",
+  cache = FALSE,
+  echo = TRUE,
+  message = FALSE, 
+  warning = FALSE,
+  hiline = TRUE
+)
+```
+
+```{r xaringan-themer, include=FALSE, warning=FALSE}
+# xaringan::inf_mr()
+library(xaringanthemer)
+style_duo_accent(
+  primary_color = "#034563",
+  secondary_color = "#04608B",
+  inverse_header_color = "#FFFFFF"
+)
+```
+
+```{r xaringanExtra-freezeframe, echo=FALSE, eval=F}
+# Banner
+library(xaringanExtra)
+xaringanExtra::use_banner(
+  top_left = "My Awesome Talk Title",
+  top_right = "Mr. Fancy Pants",
+  bottom_left = "bit.ly/my-awesome-talk",
+  exclude = "title-slide"
+)
+```
+
+```{r style_banner, echo=FALSE, eval=F}
+# Banner
+xaringanExtra::style_banner(
+  text_color = "#1874CD",
+  background_color = "#F0F8FF"#,
+  #selector = ".special-slide"
+)
+```
+
+
+```{r xaringan-tile-view, echo=FALSE}
+# Tile View
+xaringanExtra::use_tile_view()
+# Just press O (the letter O for Overview) at any point in your slideshow and the tile view appears
+# Click on a slide to jump to the slide, or press O to exit tile view.
+```
+
+```{r xaringan-scribble, echo=FALSE}
+# Scribble
+xaringanExtra::use_scribble(pen_color = "#000000") 
+# Click the pencil icon or press S to begin drawing.
+# In fact, you can use the left and right keys to undo or redo your drawings.
+# To save a copy of the slide with your drawings, your best option is to print your presentation from the browser.
+```
+
+
+## Summary
+
+### > Exploring dataset
+
+### > Clustering Time Series
+
+### > Random Forest
+
+### > Open questions
+
+---
+class: inverse center middle
+
+## Exploring dataset
+
+---
+
+## Packages and functions
+
+
+
+We've used the packages shown in the classroom, in addition to other auxiliary packages. The packages are listed below:
+
+```{r packages, echo=T, warning=FALSE}
+library('magrittr')
+library('dplyr')
+library('ggplot2')
+library('lattice')
+library('latticeExtra')
+library('dtwclust')
+library('TSclust')
+library('randomForest')
+library('keras')
+library('tensorflow')
+library('caret')
+library('Metrics')
+library('plotly')
+library('DT')
+library('htmltools')
+library('widgetframe')
+library('xaringan')
+library('xaringanthemer')
+library('xaringanExtra')
+```
+
+```{r diretorios, echo=FALSE}
+diretorio_principal <- paste0(getwd(),"/")
+```
+
+```{r import_data, echo=FALSE}
+if (!file.exists(paste0(diretorio_principal, "dataderived/dados.rds"))) {
+    dados <-
+        read.csv(paste0(
+            diretorio_principal,
+            'dataraw/rca_data_2012_2022-06-29.csv'
+        ))
+    saveRDS(dados,
+            paste0(diretorio_principal, "dataderived/dados.rds"))
+} else {
+    dados <-
+        readRDS(paste0(diretorio_principal, "dataderived/dados.rds"))
+}
+
+dados2 <- dados[, c('CellID', 'Date', 'DOAVEG_avg')]
+dados2$Date <- as.Date(dados2$Date
+)
+```
+
+
+---
+
+## Data manipulations
+
+<div style="position: relative; top: -25px;"> 
+
+
+.pull-left[
+
+After importing the data, we selected the columns 'CellID', 'Date' and **'DOAVEG_avg'**.
+
+
+```{r echo=FALSE}
+# dados %>% head(30) %>%
+#     DT::datatable(
+#         rownames = FALSE,
+#         options = list(
+#             pageLength = 30,
+#             scrollX = '400px',
+#             scrollY = '350px',
+#             dom = 't',
+#             columnDefs = list(list(
+#                 className = 'dt-center', targets = 0:(ncol(dados) - 1)
+#             ))
+#         ),
+#         caption = htmltools::tags$caption(style = 'caption-side: bottom; text-align: center;',
+#                                           'Table 1: First 30 rows & all columns')
+#     )
+dados2 %>%
+    head(30) %>%
+    DT::datatable(
+        rownames = FALSE,
+        options = list(
+            pageLength = 30,
+            scrollX = '400px',
+            scrollY = '350px',
+            dom = 't',
+            columnDefs = list(list(
+                className = 'dt-center', targets = 0:(ncol(dados2) - 1)
+            ))
+        ),
+        caption = htmltools::tags$caption(style = 'caption-side: bottom; text-align: center;',
+                                          'Table 1: First 30 rows & selected columns')
+    )
+```
+
+]
+
+</div>
+
+<div style="position: relative; left: -25px; top: -155px;">
+
+.pull-right[
+
+After this, we filtered the year 2012. In here, we have daily data. We develop a shiny app to visualize the trend of DOAVEG_avg by CellID.
+
+[DataViz in Shiny App: DOAVG Time Series by Species](https://msrcos3s.shinyapps.io/DOAVG/)
+
+After this, we summarised the mean of DOAVEG_avg grouped by CellID and Month (reduced dataset).
+
+```{r echo=FALSE}
+
+if (!file.exists(paste0(diretorio_principal, "dataderived/Drca.rds"))) {
+
+    Drca <- dados %>%
+    select(Date, CellID, DOAVEG_avg) %>%
+    mutate(
+        Date = as.Date(Date), Month = as.integer(format(Date, "%m")),
+        Year = as.integer(format(Date, "%Y"))
+    ) %>%
+    filter(Year == 2012) %>%
+    group_by(CellID, Month) %>%
+    summarise(DOAVEG_avg = mean(DOAVEG_avg))
+    
+    saveRDS(Drca,
+            paste0(diretorio_principal, "dataderived/Drca.rds"))
+} else {
+    Drca <-
+        readRDS(paste0(diretorio_principal, "dataderived/Drca.rds"))
+}
+
+Drca %>% head(30) %>%
+    DT::datatable(
+        rownames = FALSE,
+        options = list(
+            pageLength = 30,
+            scrollX = '400px',
+            scrollY = '350px',
+            dom = 't',
+            columnDefs = list(list(
+                className = 'dt-center', targets = 0:(ncol(Drca) - 1)
+            ))
+        ),
+        caption = htmltools::tags$caption(style = 'caption-side: bottom; text-align: center;',
+                                          'Table 2: First 30 rows of table summarised'),
+        colnames=c("CellID", "Month", "mean-of-DOAVEG_avg")
+    )
+```
+
+
+
+]
+
+</div>
+
+---
+
+## Data manipulations
+
+.pull-left[
+
+Then, we selected 100 cells randomly.
+
+```{r, echo=FALSE}
+# random sample 100 cells 
+CELLS <- unique(Drca$CellID)
+set.seed(123)
+cells <- sample(CELLS, 100)
+```
+
+```{r, echo=FALSE}
+# filters the cells sampled 
+drca <- Drca %>% 
+    filter(is.element(CellID, cells))
+```
+
+```{r, echo=FALSE}
+drca <- drca %>% 
+    mutate(`CellID` = as.factor(`CellID`))
+
+drca %>% head(30) %>%
+    DT::datatable(
+        rownames = FALSE,
+        options = list(
+            pageLength = 30,
+            scrollX = '400px',
+            scrollY = '280px',
+            dom = 't',
+            columnDefs = list(list(
+                className = 'dt-center', targets = 0:(ncol(drca) - 1)
+            ))
+        ),
+        caption = htmltools::tags$caption(style = 'caption-side: bottom; text-align: center;',
+                                          'Table 3: First 30 rows of random sample'),
+        colnames=c("CellID", "Month", "mean-of-DOAVEG_avg")
+    )
+
+```
+
+This gives us a data.frame of `r nrow(drca)` rows.
+
+```{r echo=FALSE}
+drca %>% dim()
+```
+
+
+]
+
+<div style="position: relative; left:-45px; top: -55px;"> 
+
+<button onClick="window.location.reload();">Refresh chart</button>
+
+.pull-right[
+```{r, echo=FALSE}
+(
+    ggplot(aes(x = `Month`, y = `mean-of-DOAVEG_avg`, color = `CellID`),
+           data = drca %>% rename(`mean-of-DOAVEG_avg` = `DOAVEG_avg`) ) +
+    geom_line() +
+    geom_point()
+) %>% plotly::ggplotly() %>% widgetframe::frameWidget(width = "600px",
+                                                      height = "450px")
+```
+
+
+
+]
+
+</div>
+
+
+---
+
+## Data manipulations
+
+
+Then, we format the data.frame (long to wide format). Now we can apply the methods of clustering time series. 
+
+```{r, echo=FALSE}
+# creating a new data frame with series in column
+aux <- list()
+for (i in 1:length(levels(as.factor(drca$CellID)))) {
+    aux[[i]] <- drca[drca$CellID == levels(as.factor(drca$CellID))[i], c(3)]
+}
+```
+
+
+```{r, echo=FALSE}
+# aux <- do.call(cbind.data.frame,aux)
+aux <- cbind.data.frame(aux)
+colnames(aux) <- levels(as.factor(drca$CellID))
+
+drca <- cbind(data.frame(Month = c(1:12)),aux)
+```
+
+
+```{r, echo=FALSE}
+saveRDS(drca, file = paste0(diretorio_principal, "dataderived/drca_DOAVEG_avg.rds"))
+```
+
+
+```{r, echo=FALSE}
+base <- readRDS(file = paste0(diretorio_principal, "dataderived/drca_DOAVEG_avg.rds"))
+```
+
+```{r, echo=FALSE}
+DT::datatable(
+  base %>% round(4), fillContainer = FALSE,
+  options = list(
+    scrollX = TRUE,
+    pageLength = 6
+  )
+)
+```
+
+---
+class: inverse center middle
+
+## Clustering Time Series
+
+---
+
+## Methods and Results (Partitional)
+
+<div style="position: relative; top: -25px;"> 
+
+.pull-left[
+```{r, message=FALSE}
+pc <- tsclust(
+    drca, # dataset
+    type = "partitional", # type of clustering method
+    k = 3L, # number of desired clusters
+    distance = "dtw_basic", # registered distance from proxy::dist()
+    centroid = "pam", # Supported string or function to calculate centroids
+    seed = 3247L, # random seed
+    trace = TRUE, # print the progress
+    args = tsclust_args( # Control parameters for fine-grained control. 
+        dist = list(window.size = 3L) # A list of arguments for a distance function
+        ) 
+)
+```
+
+]
+
+</div>
+
+<div style="position: relative; top: 60px;"> 
+
+.pull-right[
+
+```{r echo=FALSE}
+pc
+```
+
+]
+
+</div>
+
+---
+
+## Methods and Results (Partitional)
+
+```{r echo=FALSE}
+plot(pc)
+```
+
+---
+
+## Methods and Results (Hierarchical)
+
+.pull-left[
+```{r}
+hc <- tsclust(
+    drca,  # dataset
+    type = "hierarchical", # type of clustering method
+    k = 3L, # number of desired clusters
+    distance = "sbd", # registered distance from proxy::dist()
+    trace = TRUE, # print the progress
+    control = hierarchical_control(method = "average")
+)
+```
+
+]
+
+
+.pull-right[
+
+```{r echo=FALSE}
+hc
+```
+
+]
+
+
+---
+
+## Methods and Results (Hierarchical)
+
+<p style="text-align:center">
+
+```{r echo=FALSE}
+plot(hc)
+```
+
+</p>
+
+---
+
+```{r Methods and Results (Fuzzy), echo=FALSE, eval=FALSE}
+## Methods and Results (Fuzzy)
+## Chunk only for organize outline in Rstudio
+```
+
+
+<div style="position: relative; top: -30px;"> 
+
+<h2> Methods and Results (Fuzzy) </h2>
+
+</div>
+
+<div style="position: relative; left: -50px; top: -50px;"> 
+
+.pull-left[
+
+```{r}
+# Calculate autocorrelation up to 3th lag, considering a list of time series as input
+acf_fun <- function(series, ...) { lapply(series, function(x) { as.numeric(acf(x, lag.max = 3L, plot = FALSE)$acf) })}
+# Autocorrelation-based fuzzy c-mean
+fc <- tsclust(
+    drca, # dataset
+    type = "fuzzy", # type of clustering method
+    k = 3L, # number of desired clusters
+    preproc = acf_fun, # Function to preprocess data.
+    distance = "L2", # registered distance from proxy::dist()
+    seed = 123L, # random seed
+    trace = TRUE) # print the progress
+```
+
+]
+
+</div>
+
+<div style="position: relative; left: -90px; top: -60px;"> 
+
+.pull-right[
+
+
+```{r, echo=FALSE, R.options = list(width = 60)}
+fc
+```
+
+
+]
+
+</div>
+
+---
+
+## Methods and Results (Fuzzy)
+
+```{r, echo=FALSE}
+plot(fc)
+```
+
+
+---
+class: inverse center middle
+
+## Random Forest
+
+---
+
+## Data manipulations
+
+.pull-left[
+
+After importing the data, we selected the columns **'WTEMP_avg'**, 'SAL_avg', 'TPOC_avg', 'CHLAVEG_avg' and'DOAVEG_avg' and the first 40.000 rows of the dataset.
+
+```{r echo=FALSE}
+if (!file.exists(paste0(diretorio_principal, "dataderived/dados_rf.rds"))) {
+    dados <-
+        read.csv(paste0(
+            diretorio_principal,
+            'dataraw/rca_data_2012_2022-06-29.csv'
+        ), nrows=40000)
+    dados <- dados[, c(1,5,9,13,17)]
+    saveRDS(dados,
+            paste0(diretorio_principal, "dataderived/dados_rf.rds"))
+} else {
+    dados <-
+        readRDS(paste0(diretorio_principal, "dataderived/dados_rf.rds"))
+}
+
+dados %>% head(30) %>% round(2) %>% 
+    DT::datatable(
+        rownames = FALSE,
+        options = list(
+            pageLength = 30,
+            scrollX = '450px',
+            scrollY = '250px',
+            dom = 't',
+            columnDefs = list(list(
+                className = 'dt-center', targets = 0:(ncol(dados) - 1)
+            ))
+        ),
+        caption = htmltools::tags$caption(style = 'caption-side: bottom; text-align: center;',
+                                          'Table 4: First 30 rows & selected columns')
+    )
+```
+]
+
+
+<div style="position: relative; top: 80px;"> 
+
+.pull-right[
+
+
+
+Then, we divided the dataset in train and test.
+
+```{r, echo=T}
+set.seed(123)
+index = createDataPartition(dados[, 1],
+                            p = 0.8,
+                            list = F)
+treino = dados[index, ]
+teste = dados[-index, ]
+```
+
+
+]
+
+</div>
+
+---
+
+## Methods and Results
+
+
+.pull-left[
+
+
+
+After that, we trained the random forest model, considering the WTEMP_avg as the response variable and  rest as explanatory variables.
+
+```{r echo=F, eval=T}
+if (!file.exists(paste0(diretorio_principal, "dataderived/rf.rds"))) {
+    model <- randomForest(WTEMP_avg ~ ., data=treino)
+    saveRDS(model,paste0(diretorio_principal, "dataderived/rf.rds"))
+} else {
+    model <- readRDS(paste0(diretorio_principal, "dataderived/rf.rds"))
+}
+```
+
+
+```{r echo=T, eval=F}
+model <- randomForest(WTEMP_avg ~ .,
+                      data=treino)
+```
+
+```{r}
+# Making predictions
+prev <- predict(model, teste[,2:5])
+
+# Avaliating the model
+rmse(teste[,1], prev)
+```
+]
+
+.pull-right[
+```{r fig.height=6}
+# Visualizing the model
+plot(model, type='l')
+```
+]
+
+
+---
+
+## Methods and Results
+
+
+.pull-left[
+```{r echo=T, eval=T}
+# Correlação entre observado e predito.
+cor(prev, teste$WTEMP_avg)
+```
+
+
+```{r echo=F, eval=F}
+xyplot(prev ~ teste$WTEMP_avg,
+       ylab="prediction",xlab="observed",
+       aspect = "iso",auto.key = TRUE,
+       type = c("p", "smooth")) +
+    layer(panel.abline(a = 0, b = 1))
+```
+
+```{r echo=T, eval=T}
+ggplot(aes(x=prev,y=WTEMP_avg), data=as.data.frame(cbind(prev,teste))) +
+    geom_point() +
+    geom_abline(slope=1, intercept=0, col='blue') +
+    ylab("prediction") + xlab("observed")
+```
+]
+
+
+.pull-right[
+```{r echo=T, eval=T}
+# Importância das variáveis.
+importance(model)
+varImpPlot(model)
+```
+]
+
+---
+class: inverse center middle
+
+## Open questions
+
+---
+
+## Open questions
+
+### > Explore more methods of resampling strategies (holdout, cross-validation, bootstrap);
+
+### > Compare different models and select the best based in some measures (accuracy, rmse);
+
+### > Use machine learning models with caret and tidymodels frameworks;
+
+### > Explore more methods of Neural Networks / Deep Learning.
+
+---
+exclude: true
+
+
+<!-- --- -->
+<!-- class: inverse center middle -->
+
+<!-- ## Neural Network -->
+
+<!-- --- -->
+
+<!-- ## Data manipulations -->
+
+<!-- .pull-left[ -->
+
+<!-- After importing the data, we selected the columns **'WTEMP_avg'**, 'SAL_avg', 'TPOC_avg', 'CHLAVEG_avg' and'DOAVEG_avg' and the first 40.000 rows of the dataset. -->
+
+<!-- ```{r echo=FALSE} -->
+<!-- if (!file.exists(paste0(diretorio_principal, "dataderived/dados_rf.rds"))) { -->
+<!--     dados <- -->
+<!--         read.csv(paste0( -->
+<!--             diretorio_principal, -->
+<!--             'dataraw/rca_data_2012_2022-06-29.csv' -->
+<!--         ), nrows=40000) -->
+<!--     dados <- dados[, c(1,5,9,13,17)] -->
+<!--     saveRDS(dados, -->
+<!--             paste0(diretorio_principal, "dataderived/dados_rf.rds")) -->
+<!-- } else { -->
+<!--     dados <- -->
+<!--         readRDS(paste0(diretorio_principal, "dataderived/dados_rf.rds")) -->
+<!-- } -->
+
+<!-- dados %>% head(30) %>% round(2) %>% -->
+<!--     DT::datatable( -->
+<!--         rownames = FALSE, -->
+<!--         options = list( -->
+<!--             pageLength = 30, -->
+<!--             scrollX = '450px', -->
+<!--             scrollY = '250px', -->
+<!--             dom = 't', -->
+<!--             columnDefs = list(list( -->
+<!--                 className = 'dt-center', targets = 0:(ncol(dados) - 1) -->
+<!--             )) -->
+<!--         ), -->
+<!--         caption = htmltools::tags$caption(style = 'caption-side: bottom; text-align: center;', -->
+<!--                                           'Table 4: First 30 rows & selected columns') -->
+<!--     ) -->
+<!-- ``` -->
+<!-- ] -->
+
+
+<!-- <div style="position: relative; top: 80px;"> -->
+
+<!-- .pull-right[ -->
+
+<!-- Then, we divided the dataset in train and test. -->
+
+<!-- ```{r, echo=T} -->
+<!-- set.seed(123) -->
+<!-- index = createDataPartition(dados[, 1], -->
+<!--                             p = 0.8, -->
+<!--                             list = F) -->
+<!-- treino = dados[index, ] -->
+<!-- teste = dados[-index, ] -->
+<!-- ``` -->
+
+
+<!-- ] -->
+
+<!-- </div> -->
+
+<!-- --- -->
+
+<!-- ## Data manipulations -->
+
+<!-- Then, we format and scale the data to create a neural network. -->
+
+<!-- ```{r} -->
+<!-- # separando variáveis independentes e dependente -->
+<!-- x_train <- treino[, 2:5] -->
+<!-- y_train <- treino[, 1] -->
+
+<!-- x_teste <- teste[, 2:5] -->
+<!-- y_teste <- teste[, 1] -->
+
+
+<!-- # escalonando os dados -->
+<!-- x_train <- scale(x_train) -->
+<!-- x_teste <- scale(x_teste) -->
+
+
+<!-- train_array <- array(data = x_train, -->
+<!--                      dim  = dim(x_train)) -->
+<!-- teste_array <- array(data = x_teste, -->
+<!--                      dim  = dim(x_teste)) -->
+
+<!-- ``` -->
+
+
+<!-- --- -->
+
+<!-- ## Methods and Results -->
+
+<!-- .pull-left[ -->
+
+<!-- After that, we trained the neural network model, considering the WTEMP_avg as the response variable and other variables as explanatory variables. -->
+
+
+<!-- ```{r} -->
+<!-- # criando a rede neural -->
+<!-- model <- keras_model_sequential() -->
+<!-- model %>% -->
+<!--     layer_dense(units = 256, activation = "relu") %>% -->
+<!--     layer_dropout(rate = 0.4) %>% -->
+<!--     layer_dense(units = 128, activation = "relu") %>% -->
+<!--     layer_dropout(rate = 0.3) %>% -->
+<!--     layer_dense(units = 10, activation = "linear") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- summary(model) -->
+<!-- ``` -->
+<!-- ] -->
+
+
+
+
+<!-- ```{r} -->
+<!-- model %>% compile( -->
+<!--     loss = 'binary_crossentropy', #"categorical_crossentropy", # -->
+<!--     optimizer = "adam", -->
+<!--     metrics = c('accuracy') -->
+<!-- ) -->
+
+<!-- history <- model %>% fit( -->
+<!--     x = train_array, y = array(y_train, dim = c(length(y_train), 1)), -->
+<!--     epochs = 30, batch_size = 20, -->
+<!--     validation_split = 0.2 -->
+<!-- ) -->
+
+
+<!-- plot(history) -->
+
+<!-- # Compute probabilities and predictions on test set -->
+<!-- predictions <-  predict(model, teste_array) #probabilities -->
+
+<!-- #Confusion matrix -->
+<!-- table(y_teste, predictions > 0.5) -->
+
+
+<!-- library(ROCR) -->
+<!-- pred <- prediction(predictions, y_teste) -->
+<!-- pred -->
+<!-- perf <- performance(pred,"tpr","fpr", "auc") -->
+<!-- perf -->
+<!-- plot(perf) -->
+
+<!-- ``` -->
+
